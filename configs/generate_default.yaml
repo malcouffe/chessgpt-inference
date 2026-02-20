@@ -1,0 +1,31 @@
+# ============================================================
+# ChessGPT Generation Configuration
+# ============================================================
+
+# --- Checkpoint (required) ---
+checkpoint: ""
+
+# --- Device ---
+device: "auto"
+
+# --- Input ---
+moves: ""               # UCI history, e.g. "e2e4 e7e5 g1f3"
+max_new_moves: 80
+min_new_moves: 0
+
+# --- Sampling ---
+sampling:
+  temperature: 1.0
+  top_k: 40
+  top_p: 0.95
+  greedy: false
+
+# --- Legal move masking ---
+legal_mask: true
+stop_on_game_over: true
+
+# --- Reproducibility ---
+seed: 42
+
+# --- Output ---
+verbose: false
