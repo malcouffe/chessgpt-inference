@@ -2,8 +2,12 @@
 __pycache__/
 *.pyc
 *.pt
+*.safetensors
 *.egg-info/
 dist/
 build/
 .DS_Store
 .env
+hf_model/
+checkpoints/
+scripts/
