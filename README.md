@@ -75,7 +75,7 @@ See the full [model card on HuggingFace](https://huggingface.co/malcouffe/chessg
 | Architecture | Decoder-only transformer (RMSNorm, RoPE, SwiGLU) |
 | Vocabulary | 4209 UCI tokens |
 | Training data | Lichess games (ELO >= 1800), July 2025 -- January 2026 |
-| Tokens seen | ~6.55B |
+| Tokens seen | ~7.87B |
 | Validation loss | 1.3314 |
 
 ## License
