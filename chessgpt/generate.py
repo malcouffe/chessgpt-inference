@@ -5,8 +5,8 @@
 Generate chess moves with a moves-only CausalLM (ChessGPT) + optional legal-move masking.
 
 Usage:
-  chessgpt-generate --checkpoint malcouffe/chessgpt --moves "e2e4 e7e5 g1f3"
-  chessgpt-generate --checkpoint ./hf_model --set sampling.temperature=0.8 max_new_moves=40
+  chessgpt-generate --moves "e2e4 e7e5 g1f3"
+  chessgpt-generate --set sampling.temperature=0.8 max_new_moves=40
 
 Common knobs (via --set):
   sampling.temperature=1.0  sampling.top_k=40  sampling.top_p=0.95
@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.resources
-import os
 import random
 import sys
 from typing import List, Tuple
@@ -162,71 +161,16 @@ def sample_next_token(
 # Checkpoint loading
 # ---------------------------------------------------------------------------
 
-def _load_legacy_checkpoint(
-    checkpoint_path: str, device: torch.device,
-) -> Tuple[ChessGPTForCausalLM, UCITokenizer, ChessGPTConfig]:
-    """Load a legacy .pt checkpoint (backward compatibility)."""
-    from .modeling_chessgpt import ChessGPTForCausalLM as _Model
-
-    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
-
-    # Extract model config from checkpoint
-    if "config" in ckpt and "model" in ckpt.get("config", {}):
-        model_d = ckpt["config"]["model"]
-    else:
-        model_d = ckpt.get("train_config", {})
-
-    tokenizer = UCITokenizer()
-
-    config = ChessGPTConfig(
-        vocab_size=tokenizer.vocab_size,
-        d_model=int(model_d.get("d_model", 256)),
-        n_layers=int(model_d.get("n_layers", 8)),
-        n_heads=int(model_d.get("n_heads", 8)),
-        d_ff=int(model_d.get("d_ff", 1024)),
-        max_seq_len=int(model_d.get("max_seq_len", 256)),
-        dropout=float(model_d.get("dropout", 0.0)),
-    )
-
-    # Build the new model and remap old state dict keys
-    model = _Model(config).to(device)
-
-    old_sd = ckpt["model_state_dict"]
-    new_sd = {}
-    for key, value in old_sd.items():
-        # Strip _orig_mod. prefix from torch.compile'd checkpoints
-        clean_key = key.replace("_orig_mod.", "")
-
-        if clean_key == "head.weight":
-            new_key = "lm_head.weight"
-        elif clean_key == "token_emb.weight":
-            new_key = "model.embed_tokens.weight"
-        elif clean_key == "freqs_cis":
-            continue  # recomputed buffer
-        else:
-            new_key = "model." + clean_key
-        new_sd[new_key] = value
-
-    model.load_state_dict(new_sd, strict=False)
-    model.eval()
-
-    return model, tokenizer, config
+HF_MODEL_ID = "malcouffe/chessgpt"
 
 
 def load_checkpoint(
-    checkpoint_path: str, device: torch.device,
+    checkpoint_path: str = HF_MODEL_ID, device: torch.device = torch.device("cpu"),
 ) -> Tuple[ChessGPTForCausalLM, UCITokenizer, ChessGPTConfig]:
-    """Load model and tokenizer.
+    """Load model and tokenizer from HuggingFace.
 
-    checkpoint_path can be:
-    - A HuggingFace model ID (e.g., "malcouffe/chessgpt")
-    - A local directory containing HF-format model files
-    - A legacy .pt checkpoint file (backward compatibility)
+    checkpoint_path: A HuggingFace model ID (default: "malcouffe/chessgpt").
     """
-    if os.path.isfile(checkpoint_path) and checkpoint_path.endswith(".pt"):
-        return _load_legacy_checkpoint(checkpoint_path, device)
-
-    # HuggingFace from_pretrained
     model = ChessGPTForCausalLM.from_pretrained(
         checkpoint_path,
         trust_remote_code=True,
@@ -381,11 +325,11 @@ def parse_args():
         nargs="*",
         default=[],
         dest="overrides",
-        help="Override values: --set checkpoint=path.pt sampling.temperature=0.8",
+        help="Override values: --set sampling.temperature=0.8",
     )
 
     # Convenience shortcuts (most common overrides)
-    p.add_argument("--checkpoint", type=str, default=None, help="HF model ID, local dir, or legacy .pt path")
+    p.add_argument("--checkpoint", type=str, default=None, help="HuggingFace model ID (default: malcouffe/chessgpt)")
     p.add_argument("--moves", type=str, default=None, help="UCI history, e.g. 'e2e4 e7e5 g1f3'")
 
     return p.parse_args()
@@ -406,8 +350,7 @@ def main():
     cfg = load_config(config_path, GenerateConfig, overrides)
 
     if not cfg.checkpoint:
-        print("Error: --checkpoint is required (or set checkpoint=... in config)")
-        sys.exit(1)
+        cfg.checkpoint = HF_MODEL_ID
 
     device = resolve_device(cfg.device)
     set_seed(cfg.seed)

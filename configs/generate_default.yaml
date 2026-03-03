@@ -2,8 +2,8 @@
 # ChessGPT Generation Configuration
 # ============================================================
 
-# --- Checkpoint (required) ---
-checkpoint: ""
+# --- Checkpoint ---
+checkpoint: "malcouffe/chessgpt"
 
 # --- Device ---
 device: "auto"
